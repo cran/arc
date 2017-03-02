@@ -4,12 +4,12 @@
 \alias{getAppearance}
 \title{Method that generates items for values in given data frame column.}
 \usage{
-getAppearance(df, classatt)
+getAppearance(df, classAtt)
 }
 \arguments{
-\item{df}{a data frame contain column \code{classatt}.}
+\item{df}{a data frame contain column \code{classAtt}.}
 
-\item{classatt}{name of the column in \code{df} to generate items for.}
+\item{classAtt}{name of the column in \code{df} to generate items for.}
 }
 \value{
 appearance object for mining classification rules
@@ -21,4 +21,3 @@ Method that generates items for values in given data frame column.
 getAppearance(datasets::iris,"Species")
 
 }
-

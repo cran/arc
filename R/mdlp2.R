@@ -37,6 +37,10 @@ discrNumeric <- function(df, classatt, min_distinct_values = 3, unsupervised_bin
   if (exists("class_discr")){
     discr$cutp[[cl_index]] <- class_discr$cutp
   }
+  else{
+    # associate class with NULL which indicates it should not be discretized but turned to factor
+    discr$cutp[cl_index] <- list(NULL)
+  }
   return (discr)
 
 }
@@ -51,7 +55,7 @@ discrNumeric <- function(df, classatt, min_distinct_values = 3, unsupervised_bin
 #' @export
 #'
 #' @examples
-#'   applyCuts(datasets::iris, list(c(5,6), c(2,3), "All", "NULL", "NULL"), TRUE, TRUE)
+#'   applyCuts(datasets::iris, list(c(5,6), c(2,3), "All", NULL, NULL), TRUE, TRUE)
 #'
 #' @seealso{applyCut}
 #'
@@ -72,7 +76,7 @@ applyCuts <-function(df,cutp,infinite_bounds,labels)
 #' @param col input vector with data.
 #' @param cuts vector with cutpoints.
 #' There are several special values defined:
-#' \code{"NULL"} indicates that no discretization will be performed,
+#' \code{NULL} indicates that no discretization will be performed, but the value will be converted to factor
 #'  \code{"All"} indicates all values will be merged into one.
 
 #' @param infinite_bounds a logical indicating how the bounds on the extremes should look like.
@@ -90,9 +94,9 @@ applyCuts <-function(df,cutp,infinite_bounds,labels)
 applyCut <- function(col, cuts, infinite_bounds, labels)
 {
   cuts1 <- unlist(cuts)
-  if (cuts1[1] == "NULL")
+  if (is.null(cuts1[1]))
   {
-    return(col)
+    return(as.factor(col))
   }
   else if (cuts1[1] == "All")
   {
@@ -128,11 +132,12 @@ applyCut <- function(col, cuts, infinite_bounds, labels)
 }
 
 #' Unsupervised Discretization
-#' @description Discretizes provided numeric vector using unsupervised algorithm (k-Means).
+#' @description Discretizes provided numeric vector.
 #' @param categories number of categories (bins) to produce.
 #' @param data input numeric vector.
 #' @param infinite_bounds a logical indicating how the bounds on the extremes should look like.
 #' @param labels a logical indicating whether the bins of the discretized data should be represented by integer codes or as interval notation using (a;b] when set to TRUE.
+#' @param method clustering method, one of "interval" (equal interval width), "frequency" (equal frequency), "cluster" (k-means clustering). See also documentation of the \code{\link[arules]{discretize}} function from the arules package.
 #' @return Discretized data. If there was no discretization specified for some columns, these are returned as is.
 #' @export
 #'
@@ -140,19 +145,19 @@ applyCut <- function(col, cuts, infinite_bounds, labels)
 #'   discretizeUnsupervised(datasets::iris[[1]])
 #'
 
-discretizeUnsupervised <- function(data, labels=FALSE, infinite_bounds=FALSE,categories=3)
+discretizeUnsupervised <- function(data, labels=FALSE, infinite_bounds=FALSE,categories=3,method="cluster")
 {
   if (is.factor(data))
   {
-    cutp <- "NULL"
+    cutp <- NULL
     xd<-data
   }
   else if (length(unique(data))<=categories)
   {
-    cutp <- "NULL"
+    cutp <- NULL
     xd <- factor(data)
   } else {
-    cutp <- discretize(data,  "frequency", categories = categories, onlycuts=TRUE)
+    cutp <- discretize(data,  method, categories = categories, onlycuts=TRUE)
     #remove lower and upper bounds, so that they can be replaced by +-infinite
     cutp <- cutp[-c(1, length(cutp))]
     xd <- applyCut(data, cutp, infinite_bounds, labels)
@@ -199,7 +204,7 @@ mdlp2 <-  function(df, cl_index = NULL, handle_missing = FALSE, labels = FALSE,
     if (i == cl_index) next
     if (!is.numeric(df[[i]]) & skip_nonnumeric)
     {
-      cutp[[i]] <- "NULL"
+      cutp[[i]] <- NULL
       next
     }
     if (length(unique(df[[i]])) < min_distinct_values)
@@ -223,7 +228,7 @@ mdlp2 <-  function(df, cl_index = NULL, handle_missing = FALSE, labels = FALSE,
     {
       if (labels)
       {
-        cutp[[i]] <- "NULL"
+        cutp[[i]] <- NULL
         # if labels is set to true the result should be all factors
         # in this case there is no discretization, so we need to convert the number to factor explicitly
         xd[,i] <- as.factor(df[[i]])

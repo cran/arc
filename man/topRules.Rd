@@ -2,7 +2,7 @@
 % Please edit documentation in R/toprules.R
 \name{topRules}
 \alias{topRules}
-\title{Rule Generation}
+\title{Rule Generatio}
 \usage{
 topRules(txns, appearance = list(), target_rule_count = 1000,
   init_support = 0, init_conf = 0.5, conf_step = 0.05, supp_step = 0.05,
@@ -71,4 +71,3 @@ Ma, Bing Liu Wynne Hsu Yiming. Integrating classification and association rule m
 \seealso{
 \code{\link{prune}}
 }
-

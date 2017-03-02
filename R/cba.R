@@ -3,21 +3,23 @@ library(arules)
 
 
 
-#' RuleModel
+#' CBARuleModel
 #'
 #' @description  This class represents a rule-based classifier.
 
-#' @name RuleModel-class
-#' @rdname RuleModel-class
-#' @exportClass RuleModel
+#' @name CBARuleModel-class
+#' @rdname CBARuleModel-class
+#' @exportClass CBARuleModel
 #' @slot rules an object of class rules from arules package
 #' @slot cutp list of cutpoints
-#' @slot classatt name of the target class attribute
-RuleModel <- setClass("RuleModel",
+#' @slot classAtt name of the target class attribute
+#' @slot attTypes attribute types
+CBARuleModel <- setClass("CBARuleModel",
   slots = c(
     rules = "rules",
     cutp = "list",
-    classatt ="character"
+    classAtt ="character",
+    attTypes = "vector"
   )
 )
 
@@ -26,25 +28,27 @@ RuleModel <- setClass("RuleModel",
 #' Apply Rule Model
 #' @description Method that matches rule model against test data.
 #'
-#' @param object a \link{RuleModel} class instance
+#' @param object a \link{CBARuleModel} class instance
 #' @param newdata a data frame with data
 #' @param ... other arguments (currently not used)
 #' @return A vector with predictions.
 #' @export
-#' @method predict RuleModel
+#' @method predict CBARuleModel
 #' @examples
-#'   train <- datasets::iris[1:100,]
-#'   test <- datasets::iris[101:length(datasets::iris),]
+#'   allData<-datasets::iris[sample(nrow(datasets::iris)),]
+#'   trainFold <- allData[1:100,]
+#'   testFold <- allData[101:nrow(allData),]
 #'   #increase for more accurate results in longer time
 #'   target_rule_count <- 1000
-#'   classatt <- "Species"
-#'   rm <- cba(train, classatt, list(target_rule_count = target_rule_count))
-#'   prediction <- predict(rm, test)
-#'   acc <- rulemodelAccuracy(prediction, test[[classatt]])
+#'   classAtt <- "Species"
+#'   rm <- cba(trainFold, classAtt, list(target_rule_count = target_rule_count))
+#'   prediction <- predict(rm, testFold)
+#'   acc <- CBARuleModelAccuracy(prediction, testFold[[classAtt]])
 #'   message(acc)
 #' @seealso \link{cbaIris}
 #'
-predict.RuleModel <- function(object, newdata,...) {
+predict.CBARuleModel <- function(object, newdata,...) {
+  start.time <- Sys.time()
   rule_model <- object
   # apply any discretization that was applied on train data also on test data
   test_txns <- as(applyCuts(newdata, rule_model@cutp, infinite_bounds=TRUE, labels=TRUE), "transactions")
@@ -58,6 +62,9 @@ predict.RuleModel <- function(object, newdata,...) {
   # get the index of the item on the right hand side of this rule which is true
   # and lookup the name of this item in iteminfo by this index
   result <- droplevels(unlist(lapply(matches, function(match) rule_model@rules@rhs@itemInfo[which(rule_model@rules@rhs[match]@data == TRUE),][1,3])))
+  
+  end.time <- Sys.time()
+  message (paste("Prediction (CBA model application) took:", round(end.time - start.time, 2), " seconds"))  
   return(result)
 }
 
@@ -69,8 +76,10 @@ predict.RuleModel <- function(object, newdata,...) {
 #'
 #' @return Accuracy
 #' @export
-rulemodelAccuracy<- function(prediction, groundtruth)
+CBARuleModelAccuracy<- function(prediction, groundtruth)
 {
+  prediction <- as.factor(prediction)
+  groundtruth <- as.factor(groundtruth)
   both <- union(levels(groundtruth), levels(prediction))
   accuracy <- mean(factor(groundtruth, levels = both) == factor(prediction, levels = both))
   return(accuracy)
@@ -79,8 +88,8 @@ rulemodelAccuracy<- function(prediction, groundtruth)
 
 #' Method that generates items for values in given data frame column.
 #'
-#' @param df a data frame contain column \code{classatt}.
-#' @param classatt name of the column in \code{df} to generate items for.
+#' @param df a data frame contain column \code{classAtt}.
+#' @param classAtt name of the column in \code{df} to generate items for.
 #'
 #' @return appearance object for mining classification rules
 #' @export
@@ -88,9 +97,9 @@ rulemodelAccuracy<- function(prediction, groundtruth)
 #' @examples
 #' getAppearance(datasets::iris,"Species")
 #'
-getAppearance <- function(df, classatt){
-  classes <- as.character(unname(unique(unlist(df[classatt]))))
-  classitems <- paste(classatt, "=", classes, sep="")
+getAppearance <- function(df, classAtt){
+  classes <- as.character(unname(unique(unlist(df[classAtt]))))
+  classitems <- paste(classAtt, "=", classes, sep="")
   appearance <- list(rhs =  classitems, default="lhs")
   return(appearance)
 }
@@ -100,20 +109,20 @@ getAppearance <- function(df, classatt){
 #'
 #' @param path path to csv file with data.
 #' @param outpath path to write the rule set to.
-#' @param classatt the name of the class attribute.
+#' @param classAtt the name of the class attribute.
 #' @param idcolumn the name of the id column in the dataf ile.
 #' @param rulelearning_options custom options for the rule learning algorithm overriding the default values.
 #' @param pruning_options custom options for the pruning algorithm overriding the default values.
 
 #'
-#' @return Object of class \link{RuleModel}
+#' @return Object of class \link{CBARuleModel}
 #' @export
 #'
 #' @examples
 #'  # cbaCSV("path-to-.csv")
 #'
 #'
-cbaCSV <- function(path, outpath = NULL, classatt = NULL, idcolumn = NULL, rulelearning_options = NULL, pruning_options = NULL)
+cbaCSV <- function(path, outpath = NULL, classAtt = NULL, idcolumn = NULL, rulelearning_options = NULL, pruning_options = NULL)
 {
   train <- utils::read.csv(path, header  =TRUE, check.names = FALSE)
   if (!is.null(idcolumn))
@@ -121,11 +130,11 @@ cbaCSV <- function(path, outpath = NULL, classatt = NULL, idcolumn = NULL, rulel
     train <- subset( train, select = -c (idcolumn) )
   }
 
-  if (is.null(classatt))
+  if (is.null(classAtt))
   {
-    classatt<-colnames(train)[ncol(train)]
+    classAtt<-colnames(train)[ncol(train)]
   }
-  rm<-cba(train, classatt, rulelearning_options, pruning_options)
+  rm<-cba(train, classAtt, rulelearning_options, pruning_options)
   if (!is.null(outpath))
   {
     utils::write.csv(as(rm@rules, "data.frame"), outpath, row.names=TRUE, quote = TRUE)
@@ -142,37 +151,69 @@ cbaCSV <- function(path, outpath = NULL, classatt = NULL, idcolumn = NULL, rulel
 #'
 cbaIris <- function()
 {
-  classatt <- "Species"
-  train <- datasets::iris[1:100,]
-  test <- datasets::iris[101:length(datasets::iris),]
+  classAtt <- "Species"
+  set.seed(111)
+  allData <- datasets::iris[sample(nrow(datasets::iris)),]
+  trainFold <- allData[1:100,]
+  testFold <- allData[101:nrow(allData),]
   # increase for more accurate results in longer time
   target_rule_count <- 1000
-  rm <- cba(test <- datasets::iris[101:length(datasets::iris),], classatt = classatt, rulelearning_options = list(target_rule_count = target_rule_count))
-  prediction <- predict(rm, test)
-  acc <- rulemodelAccuracy(prediction, test[[classatt]])
+  rm <- cba(trainFold, classAtt = classAtt, rulelearning_options = list(target_rule_count = target_rule_count))
+  prediction <- predict(rm, testFold)
+  acc <- CBARuleModelAccuracy(prediction, testFold[[classAtt]])
+  return (acc)
+}
+
+#' @title Test CBA Workflow on Iris Dataset with numeric target
+#' @description Test workflow on iris dataset: learns a cba classifier on one "train set" fold, and applies it to the second  "test set" fold.
+#'
+#' @return Accuracy.
+#' @export
+#'
+#'
+cbaIrisNumeric <- function()
+{
+  classAtt <- "Species"
+  set.seed(111)
+  allData <- datasets::iris[sample(nrow(datasets::iris)),]
+
+  #map target to numeric codes
+  x <- vector(mode="numeric", length=nrow(allData))
+  x[allData[5] == "setosa"] <- 1
+  x[allData[5] == "virginica"] <- 2
+  x[allData[5] == "versicolor"] <- 3
+  allData[5] <- x
+
+  trainFold <- allData[1:100,]
+  testFold <- allData[101:nrow(allData),]
+  # increase for more accurate results in longer time
+  target_rule_count <- 1000
+  rm <- cba(trainFold, classAtt = classAtt, rulelearning_options = list(target_rule_count = target_rule_count))
+  prediction <- predict(rm, testFold)
+  acc <- CBARuleModelAccuracy(prediction, testFold[[classAtt]])
   return (acc)
 }
 
 #' @title CBA Classifier
-#' @description Learns a cba rule set from supplied dataframe.
+#' @description Learns a CBA rule set from supplied dataframe.
 #' @export
 #' @param train a data frame with data.
-#' @param classatt the name of the class attribute.
+#' @param classAtt the name of the class attribute.
 #' @param rulelearning_options custom options for the rule learning algorithm overriding the default values.
 #' @param pruning_options custom options for the pruning algorithm overriding the default values.
 #'
-#' @return Object of class \link{RuleModel}.
+#' @return Object of class \link{CBARuleModel}.
 #'
 #' @examples
 #'   cba(datasets::iris, "Species", rulelearning_options = list(target_rule_count = 50000))
 
-cba <- function(train, classatt, rulelearning_options=NULL, pruning_options=NULL){
+cba <- function(train, classAtt, rulelearning_options=NULL, pruning_options=NULL){
 
-  discr <- discrNumeric(train, classatt)
+  discr <- discrNumeric(train, classAtt)
 
   txns <- as(discr$Disc.data, "transactions")
 
-  appearance <- getAppearance(train, classatt)
+  appearance <- getAppearance(train, classAtt)
 
   start.time <- Sys.time()
 
@@ -180,23 +221,25 @@ cba <- function(train, classatt, rulelearning_options=NULL, pruning_options=NULL
   rules <- do.call("topRules", appendToList(list(txns = txns, appearance = appearance), rulelearning_options))
 
   end.time <- Sys.time()
-  message (paste("Rule learning took:", time.taken <- end.time - start.time))
+  message (paste("Rule learning (incl. automatic threshold detection) took:", round(end.time - start.time, 2), " seconds"))
 
   start.time <- Sys.time()
   rules <- do.call("prune", appendToList(list(rules = rules,txns = txns,classitems = appearance$rhs), pruning_options))
 
   #rules <-prune(rules, txns,classitems,pruning_options)
   end.time <- Sys.time()
-  message (paste("Pruning took:", time.taken <- end.time - start.time))
+  message (paste("Pruning took:", round(end.time - start.time,2), " seconds"))
 
   #bundle cutpoints with rule set into one object
-  rm <- RuleModel()
+  rm <- CBARuleModel()
   rm@rules <- rules
   rm@cutp <- discr$cutp
-  rm@classatt <- classatt
-
+  rm@classAtt <- classAtt
+  rm@attTypes <- sapply(train, class)
   return(rm)
 }
+
+
 
 appendToList <- function(list1,list2){
   # even if length==0, the for cycle would be run once without this condition
