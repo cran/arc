@@ -29,7 +29,9 @@ CBARuleModel <- setClass("CBARuleModel",
 #' @description Method that matches rule model against test data.
 #'
 #' @param object a \link{CBARuleModel} class instance
-#' @param newdata a data frame with data
+#' @param data a data frame with data
+#' @param discretize boolean indicating whether the passed data should be discretized
+#' using information in the passed @cutp slot of the ruleModel argument.
 #' @param ... other arguments (currently not used)
 #' @return A vector with predictions.
 #' @export
@@ -47,24 +49,52 @@ CBARuleModel <- setClass("CBARuleModel",
 #'   message(acc)
 #' @seealso \link{cbaIris}
 #'
-predict.CBARuleModel <- function(object, newdata,...) {
-  start.time <- Sys.time()
-  rule_model <- object
+predict.CBARuleModel <- function(object, data, discretize=TRUE,...) {
+  # start.time <- Sys.time()
   # apply any discretization that was applied on train data also on test data
-  test_txns <- as(applyCuts(newdata, rule_model@cutp, infinite_bounds=TRUE, labels=TRUE), "transactions")
+
+  if (discretize)
+  {
+    data <- applyCuts(data, object@cutp, infinite_bounds=TRUE, labels=TRUE)
+  }
+  test_txns <- as(data, "transactions")
   # t is logical matrix with |rules| rows |test instances| columns
   # the unname function is not strictly necessary, but it may save memory for larger data:
   #  as the is.subset function returns concatenated attribute  values as the name for each column (test instance)
-  t <- unname(is.subset(rule_model@rules@lhs, test_txns))
+  t <- unname(is.subset(object@rules@lhs, test_txns))
   # get row index of first rule matching each transaction
-  matches <- apply(t, 2, function(x) min(which(x==TRUE)))
+  # the suppressWarnings is there because of "no non-missing arguments to min; returning Inf" produced by Min
+  # the returned inf denotes that the instance is not classified, which is handled below
+  matches <- suppressWarnings(apply(t, 2, function(x) min(which(x==TRUE))))
+
+
+  # check if all instances are classified
+  first_unclassified_instance <- match(Inf,matches)
+  if (!is.na(first_unclassified_instance))
+  {
+    # the is.subset function does not mark default (with empty lhs) rule as applicable for all instances,
+    # we need to do this manually.
+
+    first_rules_with_empty_lhs <- min(which(apply(object@rules@lhs@data, 2, function(x) sum(x))==0))
+    if (!is.na(first_rules_with_empty_lhs))
+    {
+      # the default rule will be used only for instances unclassified by any of the other rules
+      matches[matches==Inf] <- first_rules_with_empty_lhs
+    }
+    else
+    {
+      stop(paste("There were unclassified instances, the first one has index: ", first_unclassified_instance, " and there is no default rule in the classifier"))
+    }
+
+  }
   # for each element in the matches vector (i.e. index of first matching rule)
   # get the index of the item on the right hand side of this rule which is true
   # and lookup the name of this item in iteminfo by this index
-  result <- droplevels(unlist(lapply(matches, function(match) rule_model@rules@rhs@itemInfo[which(rule_model@rules@rhs[match]@data == TRUE),][1,3])))
-  
-  end.time <- Sys.time()
-  message (paste("Prediction (CBA model application) took:", round(end.time - start.time, 2), " seconds"))  
+
+  result <- droplevels(unlist(lapply(matches, function(match) object@rules@rhs@itemInfo[which(object@rules@rhs[match]@data == TRUE),][1,3])))
+
+  # end.time <- Sys.time()
+  # message (paste("Prediction (CBA model application) took:", round(end.time - start.time, 2), " seconds"))
   return(result)
 }
 
@@ -205,7 +235,13 @@ cbaIrisNumeric <- function()
 #' @return Object of class \link{CBARuleModel}.
 #'
 #' @examples
+#'  # Example using automatic threshold detection
 #'   cba(datasets::iris, "Species", rulelearning_options = list(target_rule_count = 50000))
+#'  # Example using manually set confidence and support thresholds
+#'   rm <- cba(datasets::iris, "Species", rulelearning_options = list(minsupp=0.01,
+#'    minconf=0.5, minlen=1, maxlen=5, maxtime=1000, target_rule_count=50000, trim=TRUE,
+#'    find_conf_supp_thresholds=FALSE))
+#'   inspect(rm@rules)
 
 cba <- function(train, classAtt, rulelearning_options=NULL, pruning_options=NULL){
 
@@ -216,12 +252,28 @@ cba <- function(train, classAtt, rulelearning_options=NULL, pruning_options=NULL
   appearance <- getAppearance(train, classAtt)
 
   start.time <- Sys.time()
+  if (is.null(rulelearning_options) || is.null(rulelearning_options$find_conf_supp_thresholds) || rulelearning_options$find_conf_supp_thresholds==TRUE)
+  {
+    message (paste("Using automatic threshold detection"))
+    rules <- do.call("topRules", appendToList(list(txns = txns, appearance = appearance), rulelearning_options))
+  }
+  else
+  {
+    message (paste("Using manually set thresholds"))
 
+    rules <- apriori(txns, parameter =
+              list(confidence = rulelearning_options$minconf, support = rulelearning_options$minsupp, minlen = rulelearning_options$minlen, maxlen = rulelearning_options$maxlen,maxtime=rulelearning_options$maxtime),
+            appearance = appearance, control = list(verbose=FALSE))
+    if(rulelearning_options$trim & length(rules) > rulelearning_options$target_rule_count)
+    {
+      message("Removing excess discovered rules")
+      rules <- rules[1:rulelearning_options$target_rule_count]
+    }
+  }
 
-  rules <- do.call("topRules", appendToList(list(txns = txns, appearance = appearance), rulelearning_options))
 
   end.time <- Sys.time()
-  message (paste("Rule learning (incl. automatic threshold detection) took:", round(end.time - start.time, 2), " seconds"))
+  message (paste("Rule learning took:", round(end.time - start.time, 2), " seconds"))
 
   start.time <- Sys.time()
   rules <- do.call("prune", appendToList(list(rules = rules,txns = txns,classitems = appearance$rhs), pruning_options))
@@ -240,6 +292,68 @@ cba <- function(train, classAtt, rulelearning_options=NULL, pruning_options=NULL
 }
 
 
+
+
+#' @title CBA Classifier from provided rules
+#' @description Learns a CBA rule set from supplied rules
+#' @export
+#' @param train_raw a data frame with raw data (numeric attributes are not discretized).
+#' @param rules Rules class instance  output by the apriori package
+#' @param txns Transactions class instance  passed to  the arules method invocation. Transactions are created over discretized data frame  - numeric values are replaced  with intervals such as "(13;45]".
+#' @param rhs character vectors giving the labels of the items which can appear in the RHS
+#' ($rhs element of the APappearance class instance passed to the arules call)
+#' @param cutp list of cutpoints used to discretize data (required for application of the model on continuous data)
+#' @param classAtt the name of the class attribute.
+#' @param pruning_options custom options for the pruning algorithm overriding the default values.
+#'
+#' @return Object of class \link{CBARuleModel}.
+#'
+#' @examples
+#'   data(humtemp)
+#'   data_raw<-humtemp
+#'   data_discr <- humtemp
+#'
+#'   #custom discretization
+#'   data_discr[,1]<-cut(humtemp[,1],breaks=seq(from=15,to=45,by=5))
+#'   data_discr[,2]<-cut(humtemp[,2],breaks=c(0,40,60,80,100))
+#'
+#'   #change interval syntax from (15,20] to (15;20], which is required by MARC
+#'   data_discr[,1]<-as.factor(unlist(lapply(data_discr[,1], function(x) {gsub(",", ";", x)})))
+#'   data_discr[,2]<-as.factor(unlist(lapply(data_discr[,2], function(x) {gsub(",", ";", x)})))
+#'   data_discr[,3] <- as.factor(humtemp[,3])
+#'
+#'   #mine rules
+#'   classAtt="Class"
+#'   appearance <- getAppearance(data_discr, classAtt)
+#'   txns_discr <- as(data_discr, "transactions")
+#'   rules <- apriori(txns_discr, parameter =
+#'    list(confidence = 0.5, support= 3/nrow(data_discr), minlen=1, maxlen=5), appearance=appearance)
+#'   inspect(rules)
+#'
+#'
+#'   rmCBA <- cba_manual(data_raw,  rules, txns_discr, appearance$rhs,
+#'    classAtt, cutp= list(), pruning_options=NULL)
+#'   inspect (rmCBA@rules)
+#'   # prediction <- predict(rmCBA,data_discr,discretize=FALSE)
+#'   # acc <- CBARuleModelAccuracy(prediction, data_discr[[classAtt]])
+#'   # print(paste("Accuracy:",acc))
+
+cba_manual <- function(train_raw,  rules, txns, rhs, classAtt, cutp, pruning_options=NULL){
+  start.time <- Sys.time()
+  rules <- do.call("prune", appendToList(list(rules = rules,txns = txns,classitems = rhs), pruning_options))
+
+  #rules <-prune(rules, txns,classitems,pruning_options)
+  end.time <- Sys.time()
+  message (paste("Pruning took:", round(end.time - start.time,2), " seconds"))
+
+  #bundle cutpoints with rule set into one object
+  rm <- CBARuleModel()
+  rm@rules <- rules
+  rm@cutp <- cutp
+  rm@classAtt <- classAtt
+  rm@attTypes <- sapply(train_raw, class)
+  return(rm)
+}
 
 appendToList <- function(list1,list2){
   # even if length==0, the for cycle would be run once without this condition

@@ -1,6 +1,6 @@
 Package: arc
 Title: Association Rule Classification
-Version: 1.1
+Version: 1.1.2
 Author: Tomas Kliegr [aut, cre]
 Maintainer: Tomas Kliegr <kliegr@gmail.com>
 Description: Implements the Classification-based on
@@ -14,8 +14,8 @@ License: AGPL-3
 Encoding: UTF-8
 LazyData: true
 Imports: Matrix, methods, datasets
-RoxygenNote: 6.0.0
+RoxygenNote: 6.0.1
 NeedsCompilation: no
-Packaged: 2017-03-02 09:45:22 UTC; tomas
+Packaged: 2017-08-24 14:20:53 UTC; root
 Repository: CRAN
-Date/Publication: 2017-03-02 14:29:51
+Date/Publication: 2017-08-24 15:09:04 UTC
