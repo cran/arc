@@ -1,11 +1,11 @@
-24dceaaa69c4d2e7c77cbf95f488a213 *DESCRIPTION
-03e35572a68a6b4d547df7fc89daed99 *NAMESPACE
-bc3ee188ceeb0c3df41f6361b27cf13d *R/cba.R
+426877a82e5dfdaca2aec1f29501711a *DESCRIPTION
+b440a7170cdb49083e3f2f8d8a3c938a *NAMESPACE
+3a323e4032c24066baf085d5b9687c6a *R/cba.R
 55724cc64344e81ed68d7458a612ece6 *R/cutSemicolon.R
 23c5051399afc0d184d3ae8322af2287 *R/datasets.R
-ef511f46af502dbb917fe007d62cedd5 *R/m1prune.R
+798065ba4411c4717efb9fdf31cf0375 *R/m1prune.R
 ec79f68e1ed428401fb97b9403ed86a6 *R/mdlp2.R
-72e365816c59a4ca888a43abcddc910e *R/toprules.R
+cac91d0f6cdf11da8f9ce02c1dbe3a1d *R/toprules.R
 70c3065130a569aaeec89fb4ab55d883 *data/humtemp.csv
 2a985a1b9fab7a2a6b2635b83a50d0e7 *man/CBARuleModel-class.Rd
 3fe5c8fa0fc2caceb249ba79edf82861 *man/CBARuleModelAccuracy.Rd
@@ -21,8 +21,8 @@ db3a4900e388765576e1993db2806be2 *man/discretizeUnsupervised.Rd
 a2f95234a0701837eebf57ad9314e32b *man/getAppearance.Rd
 adc0a0e497148f686d1de573bd85a9da *man/humtemp.Rd
 8ee6be5382b4b01dc83a40a865bf65d3 *man/mdlp2.Rd
-feb14792a7de7a046f983e8ddbc41c65 *man/predict.CBARuleModel.Rd
+c3dcd4ddb3e78b7116398785794c8b89 *man/predict.CBARuleModel.Rd
 e24dd3a11c698eb91d754e0f5f0e2234 *man/prune.Rd
-1f07f57121f7982070c4ff416345cb3b *man/topRules.Rd
+7266bfc0a55a3993b81badd4f89a1611 *man/topRules.Rd
 4873e1f257656fb8e4b66057a7e4db13 *tests/testthat/testiris.R
 68b329da9893e34099c7d8ad5cb9c940 *tests/testthat/testthat.R
