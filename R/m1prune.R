@@ -12,6 +12,7 @@ library(R.utils)
 #' @param default_rule_pruning boolean indicating whether default pruning should be performed. If set to TRUE, default pruning is performed as in the CBA algorithm.
 #'   If set to FALSE, default pruning is not performed i.e. all rules surviving data coverage pruning are kept. In either case, a default rule is added to the end of the classifier.
 #' @param rule_window the number of rules to precompute for CBA data coverage pruning. The default value can be adjusted to decrease runtime.
+#' @param input_list_sorted_by_length indicates by default that the input rule list is sorted by antecedent length (as output by arules), if this param is set to false, the list will be resorted
 #' @param debug output debug messages.
 #' @param greedy_pruning setting to TRUE activates early stopping condition: pruning will be stopped on first rule on which total error increases.
 #'
@@ -39,7 +40,7 @@ library(R.utils)
 #'  # Final rule list size:  174
 
 
-prune <- function  (rules, txns, classitems,default_rule_pruning=TRUE, rule_window=50000,greedy_pruning=FALSE,debug=FALSE){
+prune <- function  (rules, txns, classitems,default_rule_pruning=TRUE, rule_window=50000,greedy_pruning=FALSE, input_list_sorted_by_length = TRUE,debug=FALSE){
   if (!default_rule_pruning & greedy_pruning)
   {
     stop("When greedy_pruning is enabled, default_rule_pruning must be enabled too")
@@ -58,8 +59,14 @@ prune <- function  (rules, txns, classitems,default_rule_pruning=TRUE, rule_wind
       warning("Is there at least one rule with non empty antecedent?")
       return(rules)
     })
-  # sort rules
-  rules <- sort(rules,by = c("confidence","support","lhs_length"))
+  # sort rules according to CBA criteria
+  # the first of the following two lines is not necessary as long as the rule set was mined by apriori
+  if (!input_list_sorted_by_length)
+  {
+    rules <- sort(rules, by = "lhs_length", decreasing="false")
+  }
+
+  rules <- sort(rules, by = c("confidence", "support"))
 
 
   # obtain item ids in dataframe for class items
@@ -72,9 +79,9 @@ prune <- function  (rules, txns, classitems,default_rule_pruning=TRUE, rule_wind
   # compute class frequencies
   # this is neeeded to determine support of default rule during default rule pruning
   alldata_classfrequencies <- rowSums(txns@data[classitemspositions,])
-  #set default class based on all transactions
-  #this default will be used only in the rare situation when the first rule matches all transactions,
-  #these will be removed, and thus no transactions will be left to compute default class
+  # set default class based on all transactions
+  # this default will be used only in the rare situation when the first rule matches all transactions,
+  # these will be removed, and thus no transactions will be left to compute default class
   default_class <- which.max(alldata_classfrequencies)
   orig_transaction_count <- length(txns)
   distinct_items <- ncol(txns)
@@ -163,7 +170,7 @@ prune <- function  (rules, txns, classitems,default_rule_pruning=TRUE, rule_wind
         # last_total_error should exclude default rule error, which is added to total_errors[r] later
         last_total_error_without_default <- total_errors[r]
 
-        #check if there are any more transactions to process
+        # check if there are any more transactions to process
         if (ncol(txns@data)==0)
         {
           if (debug) message(paste("rule ",r, " No transactions to process"))
@@ -174,7 +181,7 @@ prune <- function  (rules, txns, classitems,default_rule_pruning=TRUE, rule_wind
           break
         }
         else{
-          #compute default rule error only if there any transactions left
+          # compute default rule error only if there are any transactions left
           classfrequencies <- rowSums(txns@data[classitemspositions,,drop=FALSE])
           default_class <- which.max(classfrequencies)
           majority_class_tran_count <- classfrequencies[default_class]

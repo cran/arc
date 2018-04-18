@@ -231,7 +231,16 @@ cbaIrisNumeric <- function()
 #' @param train a data frame with data.
 #' @param classAtt the name of the class attribute.
 #' @param rulelearning_options custom options for the rule learning algorithm overriding the default values.
-#' @param pruning_options custom options for the pruning algorithm overriding the default values.
+#' If not specified, the the   \link{topRules} function is called and defaults specified there are used\cr
+#' \code{target_rule_count} (int) mining stops when the resulting rule set contains this number of rules; \cr
+#' \code{trim} (boolean) if set to TRUE and more than \code{target_rule_count} is discovered, only first \code{target_rule_count} rules will be returned. \cr
+#' \code{minsupp} (float)  minimum support threshold  \cr
+#' \code{minconf} (float) minimum confidence threshold \cr
+#' \code{minlen} (int) minimum length of rules, minlen=1 corresponds to rule with empty antecedent and one item in consequent. In general, rules with empty antecedent are not desirable for the subsequent pruning algorithm, therefore the value of this parameter should be set at least to value 2. \cr
+#' \code{maxlen}  (int) maximum length of rules, should be equal or higher than minlen. A higher value may decrease the number of iterations to obtain target_rule_count rules, but it also increases the risk of initial combinatorial explosion and subsequent memory crash of the apriori rule learner. \cr
+#' \code{maxtime} (int) maximum number of seconds it should take `apriori` to obtain rules. \cr
+#' \code{find_conf_supp_thresholds} (boolean) whether to use automatic threshold detection or not. \cr
+#' @param pruning_options custom options for the pruning algorithm overriding the default values. \cr
 #'
 #' @return Object of class \link{CBARuleModel}.
 #'
@@ -339,7 +348,7 @@ cba <- function(train, classAtt, rulelearning_options=NULL, pruning_options=NULL
 #'   # acc <- CBARuleModelAccuracy(prediction, data_discr[[classAtt]])
 #'   # print(paste("Accuracy:",acc))
 
-cba_manual <- function(train_raw,  rules, txns, rhs, classAtt, cutp, pruning_options=NULL){
+cba_manual <- function(train_raw,  rules, txns, rhs, classAtt, cutp, pruning_options=list(input_list_sorted_by_length=FALSE)){
   start.time <- Sys.time()
   rules <- do.call("prune", appendToList(list(rules = rules,txns = txns,classitems = rhs), pruning_options))
 

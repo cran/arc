@@ -1,7 +1,7 @@
 Package: arc
 Title: Association Rule Classification
-Version: 1.1.4
-Date: 2018-03-03
+Version: 1.2
+Date: 2018-04-13
 Author: Tomas Kliegr [aut, cre]
 Maintainer: Tomas Kliegr <kliegr@gmail.com>
 Description: Implements the Classification-based on
@@ -24,6 +24,6 @@ Imports: Matrix, methods, datasets
 Suggests: qCBA
 RoxygenNote: 6.0.1
 NeedsCompilation: no
-Packaged: 2018-03-05 13:22:47 UTC; root
+Packaged: 2018-04-18 09:45:05 UTC; root
 Repository: CRAN
-Date/Publication: 2018-03-05 19:27:13 UTC
+Date/Publication: 2018-04-18 13:23:29 UTC
