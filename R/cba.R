@@ -1,8 +1,6 @@
 #' @importFrom utils read.csv write.csv
 library(arules)
 
-
-
 #' CBARuleModel
 #'
 #' @description  This class represents a rule-based classifier.
@@ -27,7 +25,7 @@ CBARuleModel <- setClass("CBARuleModel",
 
 #' @title Returns vector with confidences for the positive class (useful for ROC or AUC computation)
 #' @description Methods for computing ROC curves require a vector of confidences
-#' of the positive class, while in qCBA, the confidence returned by predict.qCBARuleModel with
+#' of the positive class, while in CBA, the confidence returned by predict with
 #' outputProbabilies = TRUE returns confidence for the predicted class.
 #' This method converts the values to confidences for the positive class
 #' @export
@@ -42,6 +40,10 @@ CBARuleModel <- setClass("CBARuleModel",
 #' confidences = c(0.9,0.6)
 #' baseClass="setosa"
 #' getConfVectorForROC(confidences,predictedClass,baseClass)
+#'
+#' # Further examples showing how ROC curve and AUC values can be computed
+#' # using this function are available at project's GitHub homepage.
+
 
 getConfVectorForROC <- function(confidences, predictedClass, positiveClass)
 {
@@ -70,6 +72,7 @@ getConfVectorForROC <- function(confidences, predictedClass, positiveClass)
 #' @export
 #' @method predict CBARuleModel
 #' @examples
+#'   set.seed(101)
 #'   allData <- datasets::iris[sample(nrow(datasets::iris)),]
 #'   trainFold <- allData[1:100,]
 #'   testFold <- allData[101:nrow(allData),]
@@ -80,6 +83,14 @@ getConfVectorForROC <- function(confidences, predictedClass, positiveClass)
 #'   prediction <- predict(rm, testFold)
 #'   acc <- CBARuleModelAccuracy(prediction, testFold[[classAtt]])
 #'   message(acc)
+#'   # get rules responsible for each prediction
+#'   firingRuleIDs <- predict(rm, testFold, outputFiringRuleIDs=TRUE)
+#'   # show rule responsible for prediction of test instance no. 28
+#'   inspect(rm@rules[firingRuleIDs[28]])
+#'   # get prediction confidence (three different versions)
+#'   rm@rules[firingRuleIDs[28]]@quality$confidence
+#'   rm@rules[firingRuleIDs[28]]@quality$orderedConf
+#'   rm@rules[firingRuleIDs[28]]@quality$cumulativeConf
 #' @seealso \link{cbaIris}
 #'
 predict.CBARuleModel <- function(object, data, discretize=TRUE,outputFiringRuleIDs=FALSE, outputConfidenceScores=FALSE,confScoreType="ordered", positiveClass=NULL,...) {
@@ -141,11 +152,11 @@ predict.CBARuleModel <- function(object, data, discretize=TRUE,outputFiringRuleI
       if (confScoreType =="ordered")
       {
         #this position is set in method prune
-        confPositionInVector<-7
+        confPositionInVector<-which(colnames(object@rules@quality)=="orderedConf")
       }
       else
       {
-        confPositionInVector<-3
+        confPositionInVector<-which(colnames(object@rules@quality)=="confidence")
         if (confScoreType !="global")
         {
           message("Unrecognized confScoreType, using value global")
@@ -154,7 +165,6 @@ predict.CBARuleModel <- function(object, data, discretize=TRUE,outputFiringRuleI
     }
     # The method uses confidence of the firing rule (as was computed on the entire training data)
     # as the confidence estimate.
-    # This is not the best approximation of confidence, especially for rules lower in the list
     confidences <- vector()
     for (ruleId in firingRuleIDs)
     {
@@ -171,15 +181,13 @@ predict.CBARuleModel <- function(object, data, discretize=TRUE,outputFiringRuleI
   {
     return(prediction)
   }
-  # end.time <- Sys.time()
-  # message (paste("Prediction (CBA model application) took:", round(end.time - start.time, 2), " seconds"))
 }
 
 #' Prediction Accuracy
-#' @description Compares predictions with groundtruth and outputs accuracy.
+#' @description Compares predictions with true labels and outputs accuracy.
 #'
-#' @param prediction a vector with predictions
-#' @param groundtruth a vector with groundtruth
+#' @param prediction vector with predictions
+#' @param groundtruth vector with true labels
 #'
 #' @return Accuracy
 #' @export
@@ -234,7 +242,7 @@ cbaCSV <- function(path, outpath = NULL, classAtt = NULL, idcolumn = NULL, rulel
   train <- utils::read.csv(path, header  =TRUE, check.names = FALSE)
   if (!is.null(idcolumn))
   {
-    train <- subset( train, select = -c (idcolumn) )
+    train <- subset( train, select = -c(idcolumn) )
   }
 
   if (is.null(classAtt))
@@ -322,12 +330,12 @@ cbaIrisNumeric <- function()
 #'
 #' @examples
 #'  # Example using automatic threshold detection
-#'   cba(datasets::iris, "Species", rulelearning_options = list(target_rule_count = 50000))
+#'  cba(datasets::iris, "Species", rulelearning_options = list(target_rule_count = 50000))
 #'  # Example using manually set confidence and support thresholds
-#'   rm <- cba(datasets::iris, "Species", rulelearning_options = list(minsupp=0.01,
+#'  rm <- cba(datasets::iris, "Species", rulelearning_options = list(minsupp=0.01,
 #'    minconf=0.5, minlen=1, maxlen=5, maxtime=1000, target_rule_count=50000, trim=TRUE,
 #'    find_conf_supp_thresholds=FALSE))
-#'   inspect(rm@rules)
+#'  inspect(rm@rules)
 
 cba <- function(train, classAtt, rulelearning_options=NULL, pruning_options=NULL){
 
@@ -419,11 +427,11 @@ cba <- function(train, classAtt, rulelearning_options=NULL, pruning_options=NULL
 #'
 #'
 #'   rmCBA <- cba_manual(data_raw,  rules, txns_discr, appearance$rhs,
-#'    classAtt, cutp= list(), pruning_options=NULL)
+#'   classAtt, cutp= list(), pruning_options=NULL)
 #'   inspect (rmCBA@rules)
-#'   # prediction <- predict(rmCBA,data_discr,discretize=FALSE)
-#'   # acc <- CBARuleModelAccuracy(prediction, data_discr[[classAtt]])
-#'   # print(paste("Accuracy:",acc))
+#'   prediction <- predict(rmCBA,data_discr,discretize=FALSE)
+#'   acc <- CBARuleModelAccuracy(prediction, data_discr[[classAtt]])
+#'   print(paste("Accuracy:",acc))
 
 cba_manual <- function(train_raw,  rules, txns, rhs, classAtt, cutp, pruning_options=list(input_list_sorted_by_length=FALSE)){
   start.time <- Sys.time()

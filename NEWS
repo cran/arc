@@ -1,3 +1,31 @@
+arc v1.4 (Release date: 2023-08-17)
+==============
+Changes
+
+* CRAN Maintenance release
+* Incorporates changes in coercions required by Matrix package (since 1.5-0)
+* Updates in README examples
+* Added reference to the R Journal article covering arc (Hahsler et al, 2019)
+* License changed to GPL-3 from AGPL-3
+
+arc v1.3.3 (Release date: 2020-12-23)
+==============
+Changes
+
+* Bug fix - in some situations, vector position for confidence score comp. was shifted
+
+arc v1.3.2 (Release date: 2020-11-14)
+==============
+Changes
+
+* Bug fix - in some situations, two default rules were included on output
+
+arc v1.3.1 (Release date: 2020-11-07)
+==============
+Changes
+
+* Small improvements in documentation
+
 arc v1.3 (Release date: 2020-09-03)
 ==============
 Changes
@@ -5,7 +33,8 @@ Changes
 * Explainability enhancements: Predict function now supports possibility to output identifiers of rules used for classification and estimates of confidence scores (preview feature, not yet thoroughly tested).
 * Improved confidence estimation on the output of the prune function: In addition to standard measured computed by the arules library, new slots are available for each rule -- orderedConf and cumulativeConf. Order-sensitive confidence  is computed only from instances reaching the given rule as a/(a+b), where a is the number of instances matching both the antecedent (available as slot orderedSupp) and consequent and b is the number of instances matching the antecedent, but not matching the consequent of the given rule.  An experimental measure output for each rule is a a cumulative confidence.
 * Several small bug fixes and documentation enhancements
-* * Sync with changes in arules version 1.6-6
+* Sync with changes in arules version 1.6-6
+
 arc v1.2 (Release date: 2018-04-13)
 ==============
 Changes

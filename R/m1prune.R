@@ -22,7 +22,7 @@ library(R.utils)
 #' classify the instance. As a result, in addition to rule confidence -- which is computed over the
 #' whole training dataset -- it makes sense to define order-sensitive confidence, which is computed
 #' only from instances reaching the given rule as \eqn{a/(a+b)}, where \eqn{a} is the number of instances
-#' matching both the antecedent and consequent (available in slo `orderedSupp`) and \eqn{b} is the number of instances matching the antecedent, but
+#' matching both the antecedent and consequent (available in slot `orderedSupp`) and \eqn{b} is the number of instances matching the antecedent, but
 #' not matching the consequent of the given rule.  The cumulative confidence is an experimental measure,
 #' which is computed as the accuracy of the rule list comprising the given rule and all higher priority
 #' rules (rules with lower index) with uncovered instances excluded from the computation.
@@ -51,7 +51,8 @@ library(R.utils)
 #'  # Final rule list size:  6
 
 
-prune <- function  (rules, txns, classitems,default_rule_pruning=TRUE, rule_window=50000,greedy_pruning=FALSE, input_list_sorted_by_length = TRUE,debug=FALSE){
+prune <- function(rules, txns, classitems,default_rule_pruning=TRUE, rule_window=50000,greedy_pruning=FALSE, input_list_sorted_by_length = TRUE,debug=FALSE){
+
   if (!default_rule_pruning & greedy_pruning)
   {
     stop("When greedy_pruning is enabled, default_rule_pruning must be enabled too")
@@ -64,6 +65,18 @@ prune <- function  (rules, txns, classitems,default_rule_pruning=TRUE, rule_wind
   tryCatch(
     {
       rules@quality$lhs_length <- colSums(rules@lhs@data)
+      rulesWithEmptyAntecedent <- which(rules@quality$lhs_length==0)
+      if (length(rulesWithEmptyAntecedent) > 0)
+      {
+        rules <- rules[-rulesWithEmptyAntecedent]
+        if (debug) message("Rule(s) with empty antecedent removed")
+      }
+      if (length(rules) == 0)
+      {
+        warning("There are no rules with non-empty antecedent.")
+        warning("Cannot prune empty rule list")
+        return(rules)
+      }
     }, error= function(err)
     {
       warning(err)
@@ -119,7 +132,7 @@ prune <- function  (rules, txns, classitems,default_rule_pruning=TRUE, rule_wind
   ordered_conf <- rep(NA, rule_count)
   ordered_supp <- rep(NA, rule_count)
 
-  for(r in 1:rule_count)
+  for(r in seq_len(rule_count))
   {
     # the purpose of using rule windows is following:
     # bulk operations on multiple rules at a time may be cheaper than many iterative multiplications of single rule vectors with all transactions
@@ -147,14 +160,14 @@ prune <- function  (rules, txns, classitems,default_rule_pruning=TRUE, rule_wind
         }
       }
       # the result of matrix mutliplication is a matrix for which element M[r,t] corresponds to how many items in rule r are matched by an item in transaction t
-      # the conversion from ngCMatrix to dgCMatrix since the definition of matrix multiplication operations on ngCMatrix would mean different result than outlined above
-      RT.lhs <- t(as(rules@lhs@data[,ws:we,drop = FALSE],"dgCMatrix")) %*% as(txns@data,"dgCMatrix")
+      # the conversion from nMatrix to dMatrix since the definition of matrix multiplication operations on nMatrix would mean different result than outlined above
+      RT.lhs <- t(as(rules@lhs@data[,ws:we,drop = FALSE],"dMatrix")) %*% as(txns@data,"dMatrix")
 
       # this operation would also work without the subsetting by classitemspositions
       # now do the same thing for rhs
-      # Performance tip: ngCMatrix can be cast to dgCMatrix just once, outside the loop for the entire matrix
+      # Performance tip: nMatrix can be cast to dMatrix just once, outside the loop for the entire matrix
       RT.rhs <- t(as(rules@rhs@data[classitemspositions,ws:we,drop = FALSE],
-        "dgCMatrix")) %*% as(txns@data[classitemspositions,,drop = FALSE],"dgCMatrix")
+        "dMatrix")) %*% as(txns@data[classitemspositions,,drop = FALSE],"dMatrix")
 
       # thus the rule r's lhs matches the transaction t iff M[r,t] == number of items in t is the same as number of items in lhs of  rule r
       RT.matches_lhs <- (rules[ws:we,drop = FALSE]@quality$lhs_length==RT.lhs)
@@ -299,11 +312,11 @@ prune <- function  (rules, txns, classitems,default_rule_pruning=TRUE, rule_wind
 
   # add default rule to the end
   ## the lhs of the default rule has no items (all item positions to 0 in the item matrix)
-  rules@lhs@data <- cbind(rules@lhs@data, as(matrix(0, distinct_items,1),"ngCMatrix"))
+  rules@lhs@data <- cbind(rules@lhs@data, as(matrix(0, distinct_items,1),"nMatrix"))
 
   # now prepare the rhs of the default rule
   # first prepare empty vector
-  default_rhs <- as(matrix(0, distinct_items,1),"ngCMatrix")
+  default_rhs <- as(matrix(0, distinct_items,1),"nMatrix")
   # the class associated with the default rule is the class that has been precomputed as part of evaluation of the "last rule"
   default_rhs[classitemspositions[default_classes[last_rule_pos]]] <- TRUE
   # finally append the default rule rhs to the rules rhs  matrix
